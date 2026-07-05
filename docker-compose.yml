@@ -1,0 +1,23 @@
+services:
+  apt-cacher-ng:
+    build: .
+    image: custom-apt-cacher:latest
+    container_name: apt-cacher
+    restart: unless-stopped
+    ports:
+      - "3142:3142"
+    environment:
+      ACNG_PORT: "3142"
+      ACNG_BINDADDRESS: "0.0.0.0"
+      ACNG_CACHEDIR: "/var/cache/apt-cacher"
+      ACNG_LOGDIR: "/var/log/apt-cacher"
+      ACNG_FOREGROUND: "1"
+      # ACNG_ADMINAUTH: "admin:changeme"
+      # ACNG_EXTRA_ARGS: "-v"
+    volumes:
+      - acng-cache:/var/cache/apt-cacher
+      - acng-log:/var/log/apt-cacher
+
+volumes:
+  acng-cache:
+  acng-log:
