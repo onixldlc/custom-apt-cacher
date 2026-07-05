@@ -1,0 +1,83 @@
+name: acng-test-debian
+
+services:
+  apt-cacher:
+    build:
+      context: ../..
+      dockerfile: docker/debian/Dockerfile
+    image: custom-apt-cacher:debian
+    container_name: acng-test-debian-server
+    environment:
+      ACNG_PORT: "3142"
+      ACNG_BINDADDRESS: "0.0.0.0"
+      ACNG_CACHEDIR: "/var/cache/apt-cacher-ng"
+      ACNG_LOGDIR: "/var/log/apt-cacher-ng"
+      ACNG_FOREGROUND: "1"
+      ACNG_VERBOSELOG: "1"
+    volumes:
+      - acng-cache:/var/cache/apt-cacher-ng
+      - acng-log:/var/log/apt-cacher-ng
+    networks:
+      - acng-net
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/entrypoint.sh", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  client-debian:
+    image: debian:bookworm-slim
+    container_name: acng-test-debian-client-debian
+    depends_on:
+      apt-cacher:
+        condition: service_healthy
+    networks:
+      - acng-net
+    volumes:
+      - ./run-client-test.sh:/run-client-test.sh:ro
+    environment:
+      ACNG_HOST: "apt-cacher"
+      ACNG_PORT: "3142"
+      DISTRO: "debian"
+    entrypoint: ["/bin/sh", "/run-client-test.sh"]
+
+  client-ubuntu:
+    image: ubuntu:24.04
+    container_name: acng-test-debian-client-ubuntu
+    depends_on:
+      apt-cacher:
+        condition: service_healthy
+    networks:
+      - acng-net
+    volumes:
+      - ./run-client-test.sh:/run-client-test.sh:ro
+    environment:
+      ACNG_HOST: "apt-cacher"
+      ACNG_PORT: "3142"
+      DISTRO: "ubuntu"
+      DEBIAN_FRONTEND: "noninteractive"
+    entrypoint: ["/bin/sh", "/run-client-test.sh"]
+
+  verify:
+    image: debian:bookworm-slim
+    container_name: acng-test-debian-verify
+    depends_on:
+      client-debian:
+        condition: service_completed_successfully
+      client-ubuntu:
+        condition: service_completed_successfully
+    networks:
+      - acng-net
+    volumes:
+      - acng-cache:/cache:ro
+      - ./run-verify.sh:/run-verify.sh:ro
+    entrypoint: ["/bin/sh", "/run-verify.sh"]
+
+volumes:
+  acng-cache:
+  acng-log:
+
+networks:
+  acng-net:
+    driver: bridge

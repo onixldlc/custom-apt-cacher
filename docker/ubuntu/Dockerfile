@@ -1,5 +1,7 @@
 ### Stage 1: build ###
-FROM debian:bookworm-slim AS builder
+FROM ubuntu:24.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
@@ -22,12 +24,14 @@ RUN ./build.sh -DCMAKE_INSTALL_PREFIX=/usr/local -DCFGDIR=/etc/apt-cacher-ng \
 
 
 ### Stage 2: runtime ###
-FROM debian:bookworm-slim
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libevent-2.1-7 \
+        libevent-2.1-7t64 \
         libcares2 \
-        libssl3 \
+        libssl3t64 \
         libbz2-1.0 \
         liblzma5 \
         zlib1g \
@@ -42,7 +46,7 @@ COPY --from=builder /usr/local/bin/acngtool /usr/local/bin/acngtool
 COPY --from=builder /usr/local/lib/apt-cacher-ng /usr/local/lib/apt-cacher-ng
 COPY --from=builder /etc/apt-cacher-ng /etc/apt-cacher-ng.dist
 
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY docker/ubuntu/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh \
     && mkdir -p /var/cache/apt-cacher-ng /var/log/apt-cacher-ng /etc/apt-cacher-ng \
     && chown -R apt-cacher-ng:apt-cacher-ng /var/cache/apt-cacher-ng /var/log/apt-cacher-ng /etc/apt-cacher-ng
@@ -54,5 +58,5 @@ VOLUME ["/var/cache/apt-cacher-ng", "/var/log/apt-cacher-ng"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD /usr/local/bin/entrypoint.sh healthcheck || exit 1
 
-ENTRYPOINT ["/usr/sbin/tini", "--", "/usr/local/bin/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]
 CMD ["run"]

@@ -1,9 +1,0 @@
-builddir/
-.git/
-.gitignore
-*.swp
-*~
-debian/
-Debug/
-dbgen/tmp/
-dev/
