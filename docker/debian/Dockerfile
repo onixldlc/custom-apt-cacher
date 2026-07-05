@@ -17,8 +17,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /src
 COPY . /src
 
-RUN ./build.sh -DCMAKE_INSTALL_PREFIX=/usr/local -DCFGDIR=/etc/apt-cacher-ng \
-    && cmake --install builddir
+RUN rm -rf builddir && mkdir builddir && cd builddir \
+    && cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DCMAKE_INSTALL_SYSCONFDIR=/etc \
+    && cmake --build . -- -j"$(nproc)" \
+    && DESTDIR=/rootfs cmake --install .
 
 
 ### Stage 2: runtime ###
@@ -32,15 +37,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         liblzma5 \
         zlib1g \
         ca-certificates \
+        wget \
         tini \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r apt-cacher-ng \
     && useradd -r -g apt-cacher-ng -d /var/cache/apt-cacher-ng -s /usr/sbin/nologin apt-cacher-ng
 
-COPY --from=builder /usr/local/sbin/apt-cacher-ng /usr/local/sbin/apt-cacher-ng
-COPY --from=builder /usr/local/bin/acngtool /usr/local/bin/acngtool
-COPY --from=builder /usr/local/lib/apt-cacher-ng /usr/local/lib/apt-cacher-ng
-COPY --from=builder /etc/apt-cacher-ng /etc/apt-cacher-ng.dist
+COPY --from=builder /rootfs/usr/local /usr/local
+COPY --from=builder /rootfs/etc/apt-cacher-ng /etc/apt-cacher-ng.dist
+
+RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/local.conf && ldconfig \
+    && ln -s /usr/local/lib/apt-cacher-ng/acngtool /usr/local/bin/acngtool
 
 COPY docker/debian/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh \

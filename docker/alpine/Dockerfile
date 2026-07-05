@@ -17,8 +17,13 @@ RUN apk add --no-cache \
 WORKDIR /src
 COPY . /src
 
-RUN ./build.sh -DCMAKE_INSTALL_PREFIX=/usr/local -DCFGDIR=/etc/apt-cacher-ng \
-    && cmake --install builddir
+RUN rm -rf builddir && mkdir builddir && cd builddir \
+    && cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DCMAKE_INSTALL_SYSCONFDIR=/etc \
+    && cmake --build . -- -j"$(nproc)" \
+    && DESTDIR=/rootfs cmake --install .
 
 
 ### Stage 2: runtime ###
@@ -34,14 +39,20 @@ RUN apk add --no-cache \
         zlib \
         libstdc++ \
         ca-certificates \
+        wget \
         tini \
     && addgroup -S apt-cacher-ng \
     && adduser -S -G apt-cacher-ng -h /var/cache/apt-cacher-ng -s /sbin/nologin apt-cacher-ng
 
-COPY --from=builder /usr/local/sbin/apt-cacher-ng /usr/local/sbin/apt-cacher-ng
-COPY --from=builder /usr/local/bin/acngtool /usr/local/bin/acngtool
-COPY --from=builder /usr/local/lib/apt-cacher-ng /usr/local/lib/apt-cacher-ng
-COPY --from=builder /etc/apt-cacher-ng /etc/apt-cacher-ng.dist
+COPY --from=builder /rootfs/usr/local /usr/local
+COPY --from=builder /rootfs/etc/apt-cacher-ng /etc/apt-cacher-ng.dist
+
+# musl ldconfig only rebuilds cache — export lib path via ld.so.conf-style file
+RUN mkdir -p /etc \
+    && echo "/usr/local/lib" > /etc/ld-musl-x86_64.path \
+    && ln -s /usr/local/lib/apt-cacher-ng/acngtool /usr/local/bin/acngtool
+
+ENV LD_LIBRARY_PATH=/usr/local/lib
 
 COPY docker/alpine/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh \
