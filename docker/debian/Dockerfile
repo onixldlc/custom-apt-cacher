@@ -31,7 +31,7 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libevent-2.1-7 \
-        libcares2 \
+        libc-ares2 \
         libssl3 \
         libbz2-1.0 \
         liblzma5 \
