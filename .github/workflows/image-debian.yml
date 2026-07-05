@@ -1,6 +1,9 @@
 name: Build Debian Image
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -9,8 +12,8 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  BASE_VERSION: "1.0.0"
-  IMAGE_NAME: custom-apt-cacher-debian
+  IMAGE_NAME: custom-apt-cacher
+  OS_TAG: debian
   DOCKERFILE: ./docker/debian/Dockerfile
   CONTEXT: .
 
@@ -26,16 +29,18 @@ jobs:
       - name: Get version
         id: version
         run: |
+          BASE_VERSION="v$(cat VERSION | tr -d '[:space:]')"
           FULL_IMAGE="${REGISTRY}/${{ github.repository_owner }}/${IMAGE_NAME}"
 
           TAGS=$(skopeo list-tags docker://${FULL_IMAGE} 2>/dev/null | jq -r '.Tags[]?' || echo "")
 
+          echo "Base version (from VERSION): ${BASE_VERSION}"
           echo "Found tags: [$TAGS]"
 
           HIGHEST_REV=0
           for tag in $TAGS; do
             echo "Checking tag: $tag"
-            if [[ $tag =~ ^${BASE_VERSION}-r([0-9]+)$ ]]; then
+            if [[ $tag =~ ^${OS_TAG}-${BASE_VERSION}-r([0-9]+)$ ]]; then
               REV=${BASH_REMATCH[1]}
               echo "  -> Matched! Revision: $REV"
               if [[ $REV -gt $HIGHEST_REV ]]; then
@@ -45,7 +50,7 @@ jobs:
           done
 
           NEXT_REV=$((HIGHEST_REV + 1))
-          NEW_VERSION="${BASE_VERSION}-r${NEXT_REV}"
+          NEW_VERSION="${OS_TAG}-${BASE_VERSION}-r${NEXT_REV}"
 
           echo "========================================"
           echo "RESULT: version=${NEW_VERSION}"
@@ -78,7 +83,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ needs.get-version.outputs.version }}
-            type=raw,value=latest
+            type=raw,value=${{ env.OS_TAG }}
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -95,4 +100,4 @@ jobs:
         run: |
           echo "**Image:** \`${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** \`${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Tags:** \`${{ needs.get-version.outputs.version }}\`, \`latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:** \`${{ needs.get-version.outputs.version }}\`, \`${{ env.OS_TAG }}\`" >> $GITHUB_STEP_SUMMARY
