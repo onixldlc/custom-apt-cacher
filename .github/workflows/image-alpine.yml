@@ -2,8 +2,26 @@ name: Build Alpine Image
 
 on:
   push:
+    branches: [main, master]
     tags:
       - 'v*'
+    paths:
+      - 'src/**'
+      - 'conf/**'
+      - 'CMakeLists.txt'
+      - 'build.sh'
+      - 'VERSION'
+      - 'docker/alpine/**'
+      - '.github/workflows/image-alpine.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'conf/**'
+      - 'CMakeLists.txt'
+      - 'build.sh'
+      - 'VERSION'
+      - 'docker/alpine/**'
+      - '.github/workflows/image-alpine.yml'
   workflow_dispatch:
 
 permissions:
@@ -18,15 +36,25 @@ env:
   CONTEXT: .
 
 jobs:
-  get-version:
+  build:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Determine release mode
+        id: rel
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "MODE: release (tag push)"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "MODE: build-check only"
+          fi
+
       - name: Get version
+        if: steps.rel.outputs.release == 'true'
         id: version
         run: |
           BASE_VERSION="v$(cat VERSION | tr -d '[:space:]')"
@@ -59,17 +87,11 @@ jobs:
 
           echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
 
-  build:
-    runs-on: ubuntu-latest
-    needs: get-version
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
+        if: steps.rel.outputs.release == 'true'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -77,15 +99,28 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata
+        if: steps.rel.outputs.release == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ needs.get-version.outputs.version }}
+            type=raw,value=${{ steps.version.outputs.version }}
             type=raw,value=${{ env.OS_TAG }}
 
+      - name: Build (check only)
+        if: steps.rel.outputs.release != 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.CONTEXT }}
+          file: ${{ env.DOCKERFILE }}
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Build and push
+        if: steps.rel.outputs.release == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ${{ env.CONTEXT }}
@@ -98,6 +133,12 @@ jobs:
 
       - name: Summary
         run: |
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** \`${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Tags:** \`${{ needs.get-version.outputs.version }}\`, \`${{ env.OS_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.rel.outputs.release }}" = "true" ]; then
+            echo "**Mode:** release" >> $GITHUB_STEP_SUMMARY
+            echo "**Image:** \`${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "**Version:** \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "**Tags:** \`${{ steps.version.outputs.version }}\`, \`${{ env.OS_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Mode:** build-check (no push)" >> $GITHUB_STEP_SUMMARY
+            echo "Push a git tag \`v*\` to release." >> $GITHUB_STEP_SUMMARY
+          fi
