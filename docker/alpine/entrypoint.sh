@@ -11,6 +11,12 @@
 #   ACNG_REMAP_DEBREP="..."
 # any ACNG_FOO=bar becomes CLI arg Foo=bar (case handled by acng, insensitive).
 # extra passthrough: ACNG_EXTRA_ARGS for anything not fitting the pattern.
+#
+# nginx sidecar helper:
+#   if NGINX_CONF_DIR is a directory (typically a shared docker volume also
+#   mounted into nginx at /etc/nginx/conf.d), the bundled default.conf is
+#   dropped there on first start so the nginx service picks it up with no
+#   manual bind-mount.
 
 set -eu
 
@@ -18,11 +24,25 @@ CONF_DIR="${ACNG_CONF_DIR:-/etc/apt-cacher-ng}"
 DIST_DIR="/etc/apt-cacher-ng.dist"
 BIN="/usr/local/sbin/apt-cacher-ng"
 
+NGINX_CONF_DIR="${NGINX_CONF_DIR:-/shared/nginx}"
+NGINX_BUNDLED_CONF="/usr/local/share/apt-cacher-ng/nginx/default.conf"
+
 seed_conf() {
     # first run: copy shipped defaults if user's conf dir empty
     if [ ! -f "$CONF_DIR/acng.conf" ]; then
         mkdir -p "$CONF_DIR"
         cp -rn "$DIST_DIR"/. "$CONF_DIR"/
+    fi
+}
+
+seed_nginx_conf() {
+    # only if the shared dir exists (i.e. mounted from a compose volume)
+    # and the bundled conf is present, and target file is missing.
+    if [ -d "$NGINX_CONF_DIR" ] && [ -f "$NGINX_BUNDLED_CONF" ]; then
+        if [ ! -f "$NGINX_CONF_DIR/default.conf" ]; then
+            echo "seeding nginx conf -> $NGINX_CONF_DIR/default.conf"
+            cp "$NGINX_BUNDLED_CONF" "$NGINX_CONF_DIR/default.conf"
+        fi
     fi
 }
 
@@ -57,6 +77,7 @@ healthcheck() {
 
 run() {
     seed_conf
+    seed_nginx_conf
 
     # default foreground so PID 1 stays alive for docker
     : "${ACNG_FOREGROUND:=1}"

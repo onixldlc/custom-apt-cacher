@@ -1,0 +1,52 @@
+services:
+  apt-cacher:
+    image: ghcr.io/onixldlc/custom-apt-cacher:latest
+    container_name: apt-cacher
+    restart: unless-stopped
+    environment:
+      ACNG_PORT: "3142"
+      ACNG_BINDADDRESS: "0.0.0.0"
+      ACNG_CACHEDIR: "/var/cache/apt-cacher-ng"
+      ACNG_LOGDIR: "/var/log/apt-cacher-ng"
+      ACNG_FOREGROUND: "1"
+      NGINX_CONF_DIR: "/shared/nginx"
+      # ACNG_ADMINAUTH: "admin:changeme"
+      # ACNG_REMAP_DEBREP: "..."
+      # ACNG_EXTRA_ARGS: "-v"
+    volumes:
+      - acng-cache:/var/cache/apt-cacher-ng
+      - acng-log:/var/log/apt-cacher-ng
+      - nginx-conf:/shared/nginx
+    networks:
+      - acng-net
+    expose:
+      - "3142"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/entrypoint.sh", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: apt-cacher-nginx
+    restart: unless-stopped
+    depends_on:
+      apt-cacher:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    volumes:
+      - nginx-conf:/etc/nginx/conf.d:ro
+    networks:
+      - acng-net
+
+volumes:
+  acng-cache:
+  acng-log:
+  nginx-conf:
+
+networks:
+  acng-net:
+    driver: bridge

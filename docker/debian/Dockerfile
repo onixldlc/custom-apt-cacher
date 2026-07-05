@@ -49,10 +49,12 @@ COPY --from=builder /rootfs/etc/apt-cacher-ng /etc/apt-cacher-ng.dist
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/local.conf && ldconfig \
     && ln -s /usr/local/lib/apt-cacher-ng/acngtool /usr/local/bin/acngtool
 
+COPY docker/nginx/default.conf /usr/local/share/apt-cacher-ng/nginx/default.conf
+
 COPY docker/debian/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh \
-    && mkdir -p /var/cache/apt-cacher-ng /var/log/apt-cacher-ng /etc/apt-cacher-ng \
-    && chown -R apt-cacher-ng:apt-cacher-ng /var/cache/apt-cacher-ng /var/log/apt-cacher-ng /etc/apt-cacher-ng
+    && mkdir -p /var/cache/apt-cacher-ng /var/log/apt-cacher-ng /etc/apt-cacher-ng /shared/nginx \
+    && chown -R apt-cacher-ng:apt-cacher-ng /var/cache/apt-cacher-ng /var/log/apt-cacher-ng /etc/apt-cacher-ng /shared/nginx
 
 EXPOSE 3142
 

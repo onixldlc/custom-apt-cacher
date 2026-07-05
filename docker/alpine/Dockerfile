@@ -63,10 +63,12 @@ RUN mkdir -p /etc \
 
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
+COPY docker/nginx/default.conf /usr/local/share/apt-cacher-ng/nginx/default.conf
+
 COPY docker/alpine/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh \
-    && mkdir -p /var/cache/apt-cacher-ng /var/log/apt-cacher-ng /etc/apt-cacher-ng \
-    && chown -R apt-cacher-ng:apt-cacher-ng /var/cache/apt-cacher-ng /var/log/apt-cacher-ng /etc/apt-cacher-ng
+    && mkdir -p /var/cache/apt-cacher-ng /var/log/apt-cacher-ng /etc/apt-cacher-ng /shared/nginx \
+    && chown -R apt-cacher-ng:apt-cacher-ng /var/cache/apt-cacher-ng /var/log/apt-cacher-ng /etc/apt-cacher-ng /shared/nginx
 
 EXPOSE 3142
 
