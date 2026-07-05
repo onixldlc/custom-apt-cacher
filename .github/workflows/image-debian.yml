@@ -58,33 +58,39 @@ jobs:
         id: version
         run: |
           BASE_VERSION="v$(cat VERSION | tr -d '[:space:]')"
-          FULL_IMAGE="${REGISTRY}/${{ github.repository_owner }}/${IMAGE_NAME}"
+          TAG="${GITHUB_REF_NAME}"
+          echo "Git tag:          ${TAG}"
+          echo "VERSION file:     ${BASE_VERSION}"
 
-          TAGS=$(skopeo list-tags docker://${FULL_IMAGE} 2>/dev/null | jq -r '.Tags[]?' || echo "")
-
-          echo "Base version (from VERSION): ${BASE_VERSION}"
-          echo "Found tags: [$TAGS]"
-
-          HIGHEST_REV=0
-          for tag in $TAGS; do
-            echo "Checking tag: $tag"
-            if [[ $tag =~ ^${OS_TAG}-${BASE_VERSION}-r([0-9]+)$ ]]; then
-              REV=${BASH_REMATCH[1]}
-              echo "  -> Matched! Revision: $REV"
-              if [[ $REV -gt $HIGHEST_REV ]]; then
-                HIGHEST_REV=$REV
-              fi
+          # source of truth for -rN: the git tag itself (format vX.Y.Z-rN).
+          # skopeo scan is used only as a fallback when the tag omits -rN.
+          if [[ "$TAG" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+)-r([0-9]+)$ ]]; then
+            TAG_VERSION="${BASH_REMATCH[1]}"
+            REV="${BASH_REMATCH[2]}"
+            echo "Parsed from tag:  version=${TAG_VERSION} rev=r${REV}"
+            if [[ "$TAG_VERSION" != "$BASE_VERSION" ]]; then
+              echo "::warning::git tag version ${TAG_VERSION} differs from VERSION file ${BASE_VERSION}"
             fi
-          done
+          else
+            echo "Tag does not match vX.Y.Z-rN; falling back to skopeo scan"
+            FULL_IMAGE="${REGISTRY}/${{ github.repository_owner }}/${IMAGE_NAME}"
+            TAGS=$(skopeo list-tags docker://${FULL_IMAGE} 2>/dev/null | jq -r '.Tags[]?' || echo "")
+            echo "Found registry tags: [$TAGS]"
+            HIGHEST_REV=0
+            for t in $TAGS; do
+              if [[ $t =~ ^${OS_TAG}-${BASE_VERSION}-r([0-9]+)$ ]]; then
+                R=${BASH_REMATCH[1]}
+                if [[ $R -gt $HIGHEST_REV ]]; then HIGHEST_REV=$R; fi
+              fi
+            done
+            REV=$((HIGHEST_REV + 1))
+            echo "Skopeo fallback:  next rev=r${REV}"
+          fi
 
-          NEXT_REV=$((HIGHEST_REV + 1))
-          NEW_VERSION="${OS_TAG}-${BASE_VERSION}-r${NEXT_REV}"
-
+          NEW_VERSION="${OS_TAG}-${BASE_VERSION}-r${REV}"
           echo "========================================"
           echo "RESULT: version=${NEW_VERSION}"
-          echo "Previous highest revision: r${HIGHEST_REV}"
           echo "========================================"
-
           echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
