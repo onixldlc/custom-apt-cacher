@@ -22,7 +22,7 @@ RUN rm -rf builddir && mkdir builddir && cd builddir \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
         -DCMAKE_INSTALL_SYSCONFDIR=/etc \
-        -DCMAKE_CXX_FLAGS="-include sys/time.h" \
+        -DCMAKE_CXX_FLAGS="-include sys/time.h -include cstdint" \
     && cmake --build . -- -j"$(nproc)" \
     && DESTDIR=/rootfs cmake --install .
 
