@@ -17,14 +17,22 @@ RUN apk add --no-cache \
 WORKDIR /src
 COPY . /src
 
-RUN rm -rf builddir && mkdir builddir && cd builddir \
-    && cmake .. \
+RUN rm -rf builddir && mkdir builddir
+
+WORKDIR /src/builddir
+
+# force-include the musl compatibility shim into every TU
+RUN cmake .. \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
         -DCMAKE_INSTALL_SYSCONFDIR=/etc \
-        -DCMAKE_CXX_FLAGS="-include sys/time.h -include cstdint -Duint=unsigned" \
-    && cmake --build . -- -j"$(nproc)" \
-    && DESTDIR=/rootfs cmake --install .
+        -DCMAKE_CXX_FLAGS="-include /src/docker/alpine/musl-compat.h"
+
+RUN cmake --build . -- -j"$(nproc)"
+
+RUN DESTDIR=/rootfs cmake --install .
+
+WORKDIR /src
 
 
 ### Stage 2: runtime ###
