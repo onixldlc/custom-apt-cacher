@@ -19,6 +19,19 @@ Acquire::http::Proxy "http://<host-ip>:80";
 
 Verify: `curl http://<host-ip>:80/acng-report.html` (HTTP 200).
 
+### Editing the acng config
+
+`/etc/apt-cacher-ng` is exposed as the `acng-conf` named volume. On first start the container seeds it from the shipped defaults, then leaves it alone — edit files and restart the service to pick them up.
+
+```sh
+# find the volume mount on the host
+docker volume inspect --format '{{ .Mountpoint }}' custom-apt-cacher_acng-conf
+
+# or bind-mount a host dir instead of the named volume:
+#   volumes:
+#     - ./acng-etc:/etc/apt-cacher-ng
+```
+
 ## Image tags on GHCR
 
 `ghcr.io/onixldlc/custom-apt-cacher`

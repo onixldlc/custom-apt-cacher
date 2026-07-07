@@ -16,6 +16,7 @@ services:
     volumes:
       - acng-cache:/var/cache/apt-cacher-ng
       - acng-log:/var/log/apt-cacher-ng
+      - acng-conf:/etc/apt-cacher-ng
       - nginx-conf:/shared/nginx
     networks:
       - acng-net
@@ -45,6 +46,7 @@ services:
 volumes:
   acng-cache:
   acng-log:
+  acng-conf:
   nginx-conf:
 
 networks:
