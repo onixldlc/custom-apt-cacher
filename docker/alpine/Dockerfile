@@ -58,7 +58,7 @@ COPY --from=builder /rootfs/etc/apt-cacher-ng /etc/apt-cacher-ng.dist
 
 # musl ldconfig only rebuilds cache — export lib path via ld.so.conf-style file
 RUN mkdir -p /etc \
-    && echo "/usr/local/lib" > /etc/ld-musl-x86_64.path \
+    && echo "/usr/local/lib:/usr/lib:/lib" > /etc/ld-musl-x86_64.path \
     && ln -s /usr/local/lib/apt-cacher-ng/acngtool /usr/local/bin/acngtool
 
 ENV LD_LIBRARY_PATH=/usr/local/lib
@@ -72,7 +72,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh \
 
 EXPOSE 3142
 
-VOLUME ["/var/cache/apt-cacher-ng", "/var/log/apt-cacher-ng"]
+VOLUME ["/var/cache/apt-cacher-ng", "/var/log/apt-cacher-ng", "/etc/apt-cacher-ng"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD /usr/local/bin/entrypoint.sh healthcheck || exit 1

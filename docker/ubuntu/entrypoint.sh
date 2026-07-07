@@ -31,7 +31,12 @@ seed_conf() {
     # first run: copy shipped defaults if user's conf dir empty
     if [ ! -f "$CONF_DIR/acng.conf" ]; then
         mkdir -p "$CONF_DIR"
-        cp -rn "$DIST_DIR"/. "$CONF_DIR"/
+        if [ -d "$DIST_DIR" ] && [ -n "$(ls -A "$DIST_DIR" 2>/dev/null)" ]; then
+            echo "seeding conf -> $CONF_DIR (from $DIST_DIR)"
+            cp -r "$DIST_DIR"/. "$CONF_DIR"/
+        else
+            echo "warn: $DIST_DIR missing or empty; conf not seeded" >&2
+        fi
     fi
 }
 

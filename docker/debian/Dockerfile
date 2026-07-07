@@ -31,6 +31,7 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libevent-2.1-7 \
+        libevent-pthreads-2.1-7 \
         libc-ares2 \
         libssl3 \
         libbz2-1.0 \
@@ -58,7 +59,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh \
 
 EXPOSE 3142
 
-VOLUME ["/var/cache/apt-cacher-ng", "/var/log/apt-cacher-ng"]
+VOLUME ["/var/cache/apt-cacher-ng", "/var/log/apt-cacher-ng", "/etc/apt-cacher-ng"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD /usr/local/bin/entrypoint.sh healthcheck || exit 1
